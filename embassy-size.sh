@@ -21,7 +21,7 @@ do
         dec=$(echo $out | awk '{print $4}')
 
         cargo objcopy --release --quiet -- -O binary target/size.bin
-        out=$(wc -c target/demo.bin)
+        out=$(wc -c target/size.bin)
         bin=$(echo $out | awk '{print $1}')
 
         popd
