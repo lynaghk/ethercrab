@@ -5,14 +5,25 @@ use crate::{
     fmt,
 };
 
-pub trait MapValue<'a, T> {
-    fn map<U>(self, f: impl FnOnce(T) -> U) -> (&'a [u8], U);
+pub fn map<T, U>((i, value): (&[u8], T), f: impl FnOnce(T) -> U) -> (&[u8], U) {
+    (i, f(value))
 }
 
-impl<'a, T> MapValue<'a, T> for (&'a [u8], T) {
-    fn map<U>(self, f: impl FnOnce(T) -> U) -> (&'a [u8], U) {
-        (self.0, f(self.1))
-    }
+pub fn map_res<T, U, F, E>((i, value): (&[u8], T), f: F) -> Result<(&[u8], U), Error>
+where
+    F: FnOnce(T) -> Result<U, E>,
+    E: Into<Error>,
+{
+    f(value).map(|value| (i, value)).map_err(|e| e.into())
+}
+
+pub fn map_opt<T, U>(
+    (i, value): (&[u8], T),
+    f: impl FnOnce(T) -> Option<U>,
+) -> Result<(&[u8], U), Error> {
+    f(value)
+        .map(|res| (i, res))
+        .ok_or(EepromError::Decode.into())
 }
 
 pub fn new_all_consumed(i: &[u8]) -> Result<(), Error> {

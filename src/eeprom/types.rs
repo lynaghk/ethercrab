@@ -2,9 +2,11 @@
 
 use crate::{
     base_data_types::PrimitiveDataType,
-    error::{EepromError, Error, PduError, WrappedPackingError},
+    error::{EepromError, Error, WrappedPackingError},
     fmt,
-    parse::{new_all_consumed, new_le_i16, new_le_u16, new_le_u32, new_le_u8, MapValue},
+    parse::{
+        map, map_opt, map_res, new_all_consumed, new_le_i16, new_le_u16, new_le_u32, new_le_u8,
+    },
     pdu_data::PduRead,
     sync_manager_channel::{self},
 };
@@ -418,17 +420,13 @@ impl SiiGeneral {
         let (i, name_string_idx) = new_le_u8(i)?;
         let (i, _reserved) = new_le_u8(i)?;
         // let (i, coe_details) = map_opt(new_le_u8, CoeDetails::from_bits)(i)?;
-        let (i, coe_details) = new_le_u8(i).and_then(|(i, bits)| {
-            CoeDetails::from_bits(bits)
-                .map(|res| (i, res))
-                .ok_or(Error::Eeprom(EepromError::Decode))
-        })?;
+        let (i, coe_details) = map_opt(new_le_u8(i)?, |bits| CoeDetails::from_bits(bits))?;
 
         // let (i, foe_enabled) = map(new_le_u8, |num| num != 0)(i)?;
         // let (i, eoe_enabled) = map(new_le_u8, |num| num != 0)(i)?;
         // let (i, foe_enabled) = new_le_u8(i).map(|(i, num)| (i, num != 0))?;
-        let (i, foe_enabled) = new_le_u8(i)?.map(|num| num != 0);
-        let (i, eoe_enabled) = new_le_u8(i)?.map(|num| num != 0);
+        let (i, foe_enabled) = map(new_le_u8(i)?, |num| num != 0);
+        let (i, eoe_enabled) = map(new_le_u8(i)?, |num| num != 0);
 
         // Reserved, ignored
         let (i, _soe_channels) = new_le_u8(i)?;
@@ -436,14 +434,10 @@ impl SiiGeneral {
         let (i, _sysman_class) = new_le_u8(i)?;
 
         // let (i, flags) = map_opt(new_le_u8, Flags::from_bits)(i)?;
-        let (i, flags) = new_le_u8(i).and_then(|(i, bits)| {
-            Flags::from_bits(bits)
-                .map(|res| (i, res))
-                .ok_or(Error::Eeprom(EepromError::Decode))
-        })?;
+        let (i, flags) = map_opt(new_le_u8(i)?, |bits| Flags::from_bits(bits))?;
         let (i, ebus_current) = new_le_i16(i)?;
 
-        let (i, ports) = new_le_u16(i)?.map(|raw| {
+        let (i, ports) = map(new_le_u16(i)?, |raw| {
             let p1 = raw & 0x0f;
             let p2 = (raw >> 4) & 0x0f;
             let p3 = (raw >> 8) & 0x0f;
@@ -547,22 +541,16 @@ impl SyncManager {
     pub(crate) fn parse(i: &[u8]) -> Result<Self, Error> {
         let (i, start_addr) = new_le_u16(i)?;
         let (i, length) = new_le_u16(i)?;
-        let (i, control) = new_le_u8(i).and_then(|(i, bits)| {
+        let (i, control) = map_res(new_le_u8(i)?, |bits| {
             sync_manager_channel::Control::unpack(&[bits])
-                .map(|res| (i, res))
-                .map_err(|_| Error::Eeprom(EepromError::Decode))
         })?;
 
         // Ignored
         let (i, _status) = new_le_u8(i)?;
 
-        let (i, enable) = new_le_u8(i).and_then(|(i, bits)| {
-            SyncManagerEnable::from_bits(bits)
-                .map(|res| (i, res))
-                .ok_or(Error::Eeprom(EepromError::Decode))
-        })?;
+        let (i, enable) = map_opt(new_le_u8(i)?, |bits| SyncManagerEnable::from_bits(bits))?;
 
-        let (i, usage_type) = new_le_u8(i)?.map(SyncManagerType::from_primitive);
+        let (i, usage_type) = map(new_le_u8(i)?, SyncManagerType::from_primitive);
 
         new_all_consumed(i)?;
 
@@ -661,11 +649,7 @@ impl Pdo {
         let (i, sync_manager) = new_le_u8(i)?;
         let (i, dc_sync) = new_le_u8(i)?;
         let (i, name_string_idx) = new_le_u8(i)?;
-        let (i, flags) = new_le_u16(i).and_then(|(i, flags)| {
-            PdoFlags::from_bits(flags)
-                .map(|res| (i, res))
-                .ok_or(Error::Eeprom(EepromError::Decode))
-        })?;
+        let (i, flags) = map_opt(new_le_u16(i)?, |flags| PdoFlags::from_bits(flags))?;
 
         new_all_consumed(i)?;
 
@@ -713,10 +697,8 @@ impl PdoEntry {
         let (i, index) = new_le_u16(i)?;
         let (i, sub_index) = new_le_u8(i)?;
         let (i, name_string_idx) = new_le_u8(i)?;
-        let (i, data_type) = new_le_u8(i).and_then(|(i, data_type)| {
-            PrimitiveDataType::try_from_primitive(data_type)
-                .map(|res| (i, res))
-                .map_err(|_| PduError::Decode.into())
+        let (i, data_type) = map_res(new_le_u8(i)?, |data_type| {
+            PrimitiveDataType::try_from_primitive(data_type).map_err(|_| EepromError::Decode)
         })?;
         let (i, data_length_bits) = new_le_u8(i)?;
         let (i, flags) = new_le_u16(i)?;
@@ -837,11 +819,8 @@ impl DefaultMailbox {
         let (i, send_offset) = new_le_u16(i)?;
         let (i, send_size) = new_le_u16(i)?;
 
-        let (i, supported_protocols) = new_le_u16(i).and_then(|(i, protos)| {
-            MailboxProtocols::from_bits(protos)
-                .map(|res| (i, res))
-                .ok_or(Error::Eeprom(EepromError::Decode))
-        })?;
+        let (i, supported_protocols) =
+            map_opt(new_le_u16(i)?, |protos| MailboxProtocols::from_bits(protos))?;
 
         new_all_consumed(i)?;
 
