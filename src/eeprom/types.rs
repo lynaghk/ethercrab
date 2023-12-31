@@ -4,7 +4,7 @@ use crate::{
     base_data_types::PrimitiveDataType,
     error::{EepromError, Error, PduError, WrappedPackingError},
     fmt,
-    parse::{new_all_consumed, new_le_i16, new_le_u16, new_le_u32, new_le_u8},
+    parse::{new_all_consumed, new_le_i16, new_le_u16, new_le_u32, new_le_u8, MapValue},
     pdu_data::PduRead,
     sync_manager_channel::{self},
 };
@@ -426,8 +426,9 @@ impl SiiGeneral {
 
         // let (i, foe_enabled) = map(new_le_u8, |num| num != 0)(i)?;
         // let (i, eoe_enabled) = map(new_le_u8, |num| num != 0)(i)?;
-        let (i, foe_enabled) = new_le_u8(i).map(|(i, num)| (i, num != 0))?;
-        let (i, eoe_enabled) = new_le_u8(i).map(|(i, num)| (i, num != 0))?;
+        // let (i, foe_enabled) = new_le_u8(i).map(|(i, num)| (i, num != 0))?;
+        let (i, foe_enabled) = new_le_u8(i)?.map(|num| num != 0);
+        let (i, eoe_enabled) = new_le_u8(i)?.map(|num| num != 0);
 
         // Reserved, ignored
         let (i, _soe_channels) = new_le_u8(i)?;
@@ -442,22 +443,19 @@ impl SiiGeneral {
         })?;
         let (i, ebus_current) = new_le_i16(i)?;
 
-        let (i, ports) = new_le_u16(i).map(|(i, raw)| {
+        let (i, ports) = new_le_u16(i)?.map(|raw| {
             let p1 = raw & 0x0f;
             let p2 = (raw >> 4) & 0x0f;
             let p3 = (raw >> 8) & 0x0f;
             let p4 = (raw >> 12) & 0x0f;
 
-            (
-                i,
-                [
-                    PortStatus::from_primitive(p1 as u8),
-                    PortStatus::from_primitive(p2 as u8),
-                    PortStatus::from_primitive(p3 as u8),
-                    PortStatus::from_primitive(p4 as u8),
-                ],
-            )
-        })?;
+            [
+                PortStatus::from_primitive(p1 as u8),
+                PortStatus::from_primitive(p2 as u8),
+                PortStatus::from_primitive(p3 as u8),
+                PortStatus::from_primitive(p4 as u8),
+            ]
+        });
 
         // let (i, physical_memory_addr) = le_u16(i)?;
         let physical_memory_addr = 0;
@@ -564,8 +562,7 @@ impl SyncManager {
                 .ok_or(Error::Eeprom(EepromError::Decode))
         })?;
 
-        let (i, usage_type) =
-            new_le_u8(i).map(|(i, usage_type)| (i, SyncManagerType::from_primitive(usage_type)))?;
+        let (i, usage_type) = new_le_u8(i)?.map(SyncManagerType::from_primitive);
 
         new_all_consumed(i)?;
 

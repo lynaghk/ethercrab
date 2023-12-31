@@ -5,6 +5,16 @@ use crate::{
     fmt,
 };
 
+pub trait MapValue<'a, T> {
+    fn map<U>(self, f: impl FnOnce(T) -> U) -> (&'a [u8], U);
+}
+
+impl<'a, T> MapValue<'a, T> for (&'a [u8], T) {
+    fn map<U>(self, f: impl FnOnce(T) -> U) -> (&'a [u8], U) {
+        (self.0, f(self.1))
+    }
+}
+
 pub fn new_all_consumed(i: &[u8]) -> Result<(), Error> {
     if i.is_empty() {
         return Ok(());
