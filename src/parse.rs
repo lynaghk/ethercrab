@@ -34,6 +34,20 @@ pub fn new_all_consumed(i: &[u8]) -> Result<(), Error> {
     Err(PduError::Decode.into())
 }
 
+pub fn le_u16_pair(i: &[u8]) -> Result<(&[u8], (u16, u16)), Error> {
+    if i.len() < 4 {
+        Err(EepromError::Decode)?;
+    }
+
+    let (first, i) = i.split_at(2);
+    let (second, i) = i.split_at(2);
+
+    let first = u16::from_le_bytes(fmt::unwrap!(first.try_into()));
+    let second = u16::from_le_bytes(fmt::unwrap!(second.try_into()));
+
+    Ok((i, (first, second)))
+}
+
 pub fn new_le_u16(i: &[u8]) -> Result<(&[u8], u16), Error> {
     if i.len() < 2 {
         Err(EepromError::Decode)?;

@@ -6,11 +6,11 @@ use crate::{
     error::{Error, PduError},
     fmt,
     generate::le_u16,
+    parse::{le_u16_pair, map, new_le_u32},
     pdu_data::{PduData, PduRead},
     pdu_loop::{PduResponse, RxFrameDataBuf},
     Client,
 };
-use nom::{combinator::map, sequence::pair, IResult};
 
 const NOP: u8 = 0x00;
 const APRD: u8 = 0x01;
@@ -469,47 +469,136 @@ impl Command {
     }
 
     /// Parse a command from a code and address data (e.g. `(u16, u16)` or `u32`), producing a [`Command`].
-    pub(crate) fn parse(command_code: u8, i: &[u8]) -> IResult<&[u8], Self> {
-        use nom::number::complete::{le_u16, le_u32};
+    pub(crate) fn parse(command_code: u8, i: &[u8]) -> Result<(&[u8], Self), Error> {
+        let res = match command_code {
+            NOP => (i, Command::Nop),
 
-        match command_code {
-            NOP => Ok((i, Command::Nop)),
-
-            APRD => map(pair(le_u16, le_u16), |(address, register)| {
+            APRD => map(le_u16_pair(i)?, |(address, register)| {
                 Command::Read(Reads::Aprd { address, register })
-            })(i),
-            FPRD => map(pair(le_u16, le_u16), |(address, register)| {
+            }),
+            FPRD => map(le_u16_pair(i)?, |(address, register)| {
                 Command::Read(Reads::Fprd { address, register })
-            })(i),
-            BRD => map(pair(le_u16, le_u16), |(address, register)| {
+            }),
+            BRD => map(le_u16_pair(i)?, |(address, register)| {
                 Command::Read(Reads::Brd { address, register })
-            })(i),
-            LRD => map(le_u32, |address| Command::Read(Reads::Lrd { address }))(i),
+            }),
+            LRD => map(new_le_u32(i)?, |address| {
+                Command::Read(Reads::Lrd { address })
+            }),
 
-            BWR => map(pair(le_u16, le_u16), |(address, register)| {
+            BWR => map(le_u16_pair(i)?, |(address, register)| {
                 Command::Write(Writes::Bwr { address, register })
-            })(i),
-            APWR => map(pair(le_u16, le_u16), |(address, register)| {
+            }),
+            APWR => map(le_u16_pair(i)?, |(address, register)| {
                 Command::Write(Writes::Apwr { address, register })
-            })(i),
-            FPWR => map(pair(le_u16, le_u16), |(address, register)| {
+            }),
+            FPWR => map(le_u16_pair(i)?, |(address, register)| {
                 Command::Write(Writes::Fpwr { address, register })
-            })(i),
-            FRMW => map(pair(le_u16, le_u16), |(address, register)| {
+            }),
+            FRMW => map(le_u16_pair(i)?, |(address, register)| {
                 Command::Read(Reads::Frmw { address, register })
-            })(i),
-            LWR => map(le_u32, |address| Command::Write(Writes::Lwr { address }))(i),
+            }),
+            LWR => map(new_le_u32(i)?, |address| {
+                Command::Write(Writes::Lwr { address })
+            }),
 
-            LRW => map(le_u32, |address| Command::Write(Writes::Lrw { address }))(i),
+            LRW => map(new_le_u32(i)?, |address| {
+                Command::Write(Writes::Lrw { address })
+            }),
 
             other => {
                 fmt::error!("Invalid command code {:#02x}", other);
 
-                Err(nom::Err::Failure(nom::error::Error {
-                    input: i,
-                    code: nom::error::ErrorKind::Tag,
-                }))
+                return Err(Error::Pdu(PduError::Decode));
             }
-        }
+        };
+
+        Ok(res)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::EepromError;
+
+    #[test]
+    fn parse_nop() {
+        assert_eq!(
+            Command::parse(0, &[0xaa, 0xbb, 0xcc, 0xdd]),
+            Ok(([0xaa, 0xbb, 0xcc, 0xdd].as_slice(), Command::Nop))
+        );
+    }
+
+    #[test]
+    fn invalid_command_error() {
+        assert_eq!(
+            Command::parse(0xaa, &[0xbb, 0xcc]),
+            Err(Error::Pdu(PduError::Decode))
+        );
+    }
+
+    #[test]
+    fn parse_u16s() {
+        assert_eq!(
+            Command::parse(FPRD, &[0xaa, 0xbb, 0xcc, 0xdd]),
+            Ok((
+                [].as_slice(),
+                Command::Read(Reads::Fprd {
+                    address: 0xbbaa,
+                    register: 0xddcc
+                })
+            ))
+        );
+    }
+
+    #[test]
+    fn parse_u32() {
+        assert_eq!(
+            Command::parse(LRD, &[0xaa, 0xbb, 0xcc, 0xdd]),
+            Ok((
+                [].as_slice(),
+                Command::Read(Reads::Lrd {
+                    address: 0xddccbbaa
+                })
+            ))
+        );
+    }
+
+    #[test]
+    fn too_long_returns_rest() {
+        assert_eq!(
+            Command::parse(LRD, &[0xaa, 0xbb, 0xcc, 0xdd, 0x33, 0x44]),
+            Ok((
+                [0x33, 0x44].as_slice(),
+                Command::Read(Reads::Lrd {
+                    address: 0xddccbbaa
+                })
+            ))
+        );
+    }
+
+    #[test]
+    fn too_short_fails() {
+        assert_eq!(
+            Command::parse(LRD, &[]),
+            Err(Error::Eeprom(EepromError::Decode)),
+            "empty slice"
+        );
+        assert_eq!(
+            Command::parse(LRW, &[0xaa]),
+            Err(Error::Eeprom(EepromError::Decode)),
+            "1 byte"
+        );
+        assert_eq!(
+            Command::parse(FRMW, &[0xaa, 0xbb]),
+            Err(Error::Eeprom(EepromError::Decode)),
+            "2 bytes"
+        );
+        assert_eq!(
+            Command::parse(BRD, &[0xaa, 0xbb, 0xcc]),
+            Err(Error::Eeprom(EepromError::Decode)),
+            "3 bytes"
+        );
     }
 }
