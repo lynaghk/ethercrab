@@ -314,8 +314,7 @@ mod tests {
         let data = [0xaau8, 0xbb, 0xcc, 0xdd];
 
         let poller = poll_fn(|ctx| {
-            let mut written_packet = Vec::new();
-            written_packet.resize(FRAME_OVERHEAD + data.len(), 0);
+            let mut written_packet = vec![0; FRAME_OVERHEAD + data.len()];
 
             let mut frame_fut = pin!(pdu_loop.pdu_tx_readwrite(
                 Command::fpwr(0x5678, 0x1234),

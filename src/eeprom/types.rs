@@ -419,7 +419,7 @@ impl SiiGeneral {
         let (i, order_string_idx) = new_le_u8(i)?;
         let (i, name_string_idx) = new_le_u8(i)?;
         let (i, _reserved) = new_le_u8(i)?;
-        let (i, coe_details) = map_opt(new_le_u8(i)?, |bits| CoeDetails::from_bits(bits))?;
+        let (i, coe_details) = map_opt(new_le_u8(i)?, CoeDetails::from_bits)?;
         let (i, foe_enabled) = map(new_le_u8(i)?, |num| num != 0);
         let (i, eoe_enabled) = map(new_le_u8(i)?, |num| num != 0);
 
@@ -429,7 +429,7 @@ impl SiiGeneral {
         let (i, _sysman_class) = new_le_u8(i)?;
 
         // let (i, flags) = map_opt(new_le_u8, Flags::from_bits)(i)?;
-        let (i, flags) = map_opt(new_le_u8(i)?, |bits| Flags::from_bits(bits))?;
+        let (i, flags) = map_opt(new_le_u8(i)?, Flags::from_bits)?;
         let (i, ebus_current) = new_le_i16(i)?;
 
         let (i, ports) = map(new_le_u16(i)?, |raw| {
@@ -543,7 +543,7 @@ impl SyncManager {
         // Ignored
         let (i, _status) = new_le_u8(i)?;
 
-        let (i, enable) = map_opt(new_le_u8(i)?, |bits| SyncManagerEnable::from_bits(bits))?;
+        let (i, enable) = map_opt(new_le_u8(i)?, SyncManagerEnable::from_bits)?;
 
         let (i, usage_type) = map(new_le_u8(i)?, SyncManagerType::from_primitive);
 
@@ -644,7 +644,7 @@ impl Pdo {
         let (i, sync_manager) = new_le_u8(i)?;
         let (i, dc_sync) = new_le_u8(i)?;
         let (i, name_string_idx) = new_le_u8(i)?;
-        let (i, flags) = map_opt(new_le_u16(i)?, |flags| PdoFlags::from_bits(flags))?;
+        let (i, flags) = map_opt(new_le_u16(i)?, PdoFlags::from_bits)?;
 
         new_all_consumed(i)?;
 
@@ -814,8 +814,7 @@ impl DefaultMailbox {
         let (i, send_offset) = new_le_u16(i)?;
         let (i, send_size) = new_le_u16(i)?;
 
-        let (i, supported_protocols) =
-            map_opt(new_le_u16(i)?, |protos| MailboxProtocols::from_bits(protos))?;
+        let (i, supported_protocols) = map_opt(new_le_u16(i)?, MailboxProtocols::from_bits)?;
 
         new_all_consumed(i)?;
 
