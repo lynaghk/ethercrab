@@ -1,15 +1,14 @@
 use crate::{
     eeprom::types::{
-        CategoryType, DefaultMailbox, FromEeprom, PdoEntry, SiiGeneral, RX_PDO_RANGE, TX_PDO_RANGE,
+        CategoryType, DefaultMailbox, PdoEntry, SiiGeneral, RX_PDO_RANGE, TX_PDO_RANGE,
     },
     eeprom::{
         device_reader::SII_FIRST_CATEGORY_START,
-        types::{FmmuEx, FmmuUsage, Pdo, PdoType, SyncManager},
+        types::{FmmuEx, FmmuUsage, Pdo, PdoType, SlaveIdentity, SyncManager},
         ChunkReader, EepromDataProvider,
     },
     error::{EepromError, Error, Item},
     fmt,
-    slave::SlaveIdentity,
 };
 use core::{ops::RangeInclusive, str::FromStr};
 use embedded_io_async::Read;

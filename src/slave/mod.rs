@@ -17,7 +17,10 @@ use crate::{
     },
     command::Command,
     dl_status::DlStatus,
-    eeprom::{device_reader::DeviceEeprom, types::SiiOwner},
+    eeprom::{
+        device_reader::DeviceEeprom,
+        types::{SiiOwner, SlaveIdentity},
+    },
     error::{Error, MailboxError, PduError},
     fmt,
     mailbox::MailboxType,
@@ -40,7 +43,6 @@ use packed_struct::{PackedStruct, PackedStructInfo, PackedStructSlice};
 
 pub use self::pdi::SlavePdi;
 pub use self::types::IoRanges;
-pub use self::types::SlaveIdentity;
 use self::{eeprom::SlaveEeprom, slave_client::SlaveClient, types::Mailbox};
 
 /// Slave device metadata. See [`SlaveRef`] for richer behaviour.

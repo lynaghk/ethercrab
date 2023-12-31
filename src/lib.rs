@@ -191,6 +191,8 @@ pub mod internals;
 #[cfg(feature = "std")]
 pub mod std;
 
+use crate::error::Error;
+use error::PduError;
 use nom::IResult;
 use smoltcp::wire::{EthernetAddress, EthernetProtocol};
 
@@ -199,9 +201,10 @@ pub use client::Client;
 pub use client_config::{ClientConfig, RetryBehaviour};
 pub use coe::SubIndex;
 pub use command::{Command, Reads, Writes};
+pub use eeprom::types::SlaveIdentity;
 pub use pdu_loop::{PduLoop, PduRx, PduStorage, PduTx, SendableFrame};
 pub use register::RegisterAddress;
-pub use slave::{Slave, SlaveIdentity, SlavePdi, SlaveRef};
+pub use slave::{Slave, SlavePdi, SlaveRef};
 pub use slave_group::{GroupId, GroupSlaveIterator, SlaveGroup, SlaveGroupHandle, SlaveGroupState};
 pub use slave_state::SlaveState;
 pub use timer_factory::Timeouts;
@@ -229,4 +232,13 @@ where
             nom::error::ErrorKind::Eof,
         )))
     }
+}
+
+// TODO: Move to parsing module
+fn new_all_consumed(i: &[u8]) -> Result<(), Error> {
+    if i.is_empty() {
+        return Ok(());
+    }
+
+    Err(PduError::Decode.into())
 }
