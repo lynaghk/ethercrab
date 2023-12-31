@@ -419,12 +419,7 @@ impl SiiGeneral {
         let (i, order_string_idx) = new_le_u8(i)?;
         let (i, name_string_idx) = new_le_u8(i)?;
         let (i, _reserved) = new_le_u8(i)?;
-        // let (i, coe_details) = map_opt(new_le_u8, CoeDetails::from_bits)(i)?;
         let (i, coe_details) = map_opt(new_le_u8(i)?, |bits| CoeDetails::from_bits(bits))?;
-
-        // let (i, foe_enabled) = map(new_le_u8, |num| num != 0)(i)?;
-        // let (i, eoe_enabled) = map(new_le_u8, |num| num != 0)(i)?;
-        // let (i, foe_enabled) = new_le_u8(i).map(|(i, num)| (i, num != 0))?;
         let (i, foe_enabled) = map(new_le_u8(i)?, |num| num != 0);
         let (i, eoe_enabled) = map(new_le_u8(i)?, |num| num != 0);
 

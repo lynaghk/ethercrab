@@ -596,8 +596,6 @@ where
 
             // If it's a normal upload, the response payload is returned in the initial mailbox read
             if complete_size <= u32::from(data_length) {
-                // let (_rest, data) = take(data_length)(data)?;
-
                 let data = data
                     .get(0..usize::from(data_length))
                     .ok_or(Error::Pdu(PduError::Decode))?;
