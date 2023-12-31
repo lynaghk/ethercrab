@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-echo -e "commit,date,text,bss,dec,bin" > sizes.csv
+echo -e "commit,date,text,bss,dec,bin" > target/sizes.csv
 
 set -e
 
@@ -26,7 +26,7 @@ do
 
         popd
 
-        echo -e "$commit,$date,$text,$bss,$dec,$bin" >> sizes.csv
+        echo -e "$commit,$date,$text,$bss,$dec,$bin" >> target/sizes.csv
     fi
 done
 
