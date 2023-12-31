@@ -3,14 +3,9 @@ use crate::{
     command::Command,
     error::{Error, PduError, PduValidationError},
     fmt,
+    parse::{map_res, new_le_u16, new_le_u8, new_take},
     pdu_loop::{frame_header::FrameHeader, pdu_flags::PduFlags},
     ETHERCAT_ETHERTYPE, MASTER_ADDR,
-};
-use nom::{
-    bytes::complete::take,
-    combinator::map_res,
-    error::context,
-    number::complete::{le_u16, u8},
 };
 use packed_struct::PackedStructSlice;
 use smoltcp::wire::{EthernetAddress, EthernetFrame};
@@ -56,13 +51,17 @@ impl<'sto> PduRx<'sto> {
 
         let i = raw_packet.payload();
 
-        let (i, header) = context("header", FrameHeader::parse)(i)?;
+        let (i, header) = FrameHeader::parse(i)?;
 
         // Only take as much as the header says we should
-        let (_rest, i) = take(header.payload_len())(i)?;
+        let i = i
+            .get(0..header.payload_len())
+            .ok_or(Error::Pdu(PduError::Decode))?;
 
-        let (i, command_code) = u8(i)?;
-        let (i, index) = u8(i)?;
+        // let (_rest, i) = take(header.payload_len())(i)?;
+
+        let (i, command_code) = new_le_u8(i)?;
+        let (i, index) = new_le_u8(i)?;
 
         let mut frame = self
             .storage
@@ -92,10 +91,10 @@ impl<'sto> PduRx<'sto> {
                 )));
             }
 
-            let (i, flags) = map_res(take(2usize), PduFlags::unpack_from_slice)(i)?;
-            let (i, irq) = le_u16(i)?;
-            let (i, data) = take(flags.length)(i)?;
-            let (i, working_counter) = le_u16(i)?;
+            let (i, flags) = map_res(new_take(i, 2usize)?, PduFlags::unpack_from_slice)?;
+            let (i, irq) = new_le_u16(i)?;
+            let (i, data) = new_take(i, usize::from(flags.length))?;
+            let (i, working_counter) = new_le_u16(i)?;
 
             fmt::trace!(
                 "Received frame with index {} ({:#04x}), WKC {}",

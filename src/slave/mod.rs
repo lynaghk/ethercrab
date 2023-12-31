@@ -24,6 +24,7 @@ use crate::{
     error::{Error, MailboxError, PduError},
     fmt,
     mailbox::MailboxType,
+    parse::new_le_u32,
     pdu_data::{PduData, PduRead},
     pdu_loop::{CheckWorkingCounter, RxFrameDataBuf},
     register::RegisterAddress,
@@ -38,7 +39,6 @@ use core::{
     ops::Deref,
     sync::atomic::{AtomicU8, Ordering},
 };
-use nom::{bytes::complete::take, number::complete::le_u32};
 use packed_struct::{PackedStruct, PackedStructInfo, PackedStructSlice};
 
 pub use self::pdi::SlavePdi;
@@ -584,7 +584,7 @@ where
         else {
             let data_length = headers.header.length.saturating_sub(0x0a);
 
-            let (data, complete_size) = le_u32(data)?;
+            let (data, complete_size) = new_le_u32(data)?;
 
             // The provided buffer isn't long enough to contain all mailbox data.
             if complete_size > buf.len() as u32 {
@@ -596,7 +596,11 @@ where
 
             // If it's a normal upload, the response payload is returned in the initial mailbox read
             if complete_size <= u32::from(data_length) {
-                let (_rest, data) = take(data_length)(data)?;
+                // let (_rest, data) = take(data_length)(data)?;
+
+                let data = data
+                    .get(0..usize::from(data_length))
+                    .ok_or(Error::Pdu(PduError::Decode))?;
 
                 let buf = &mut buf[0..usize::from(data_length)];
 

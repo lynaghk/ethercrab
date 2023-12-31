@@ -408,21 +408,6 @@ impl From<smoltcp::wire::Error> for Error {
     }
 }
 
-impl<I> From<nom::Err<nom::error::Error<I>>> for Error
-where
-    I: core::fmt::Debug,
-{
-    #[allow(unused)]
-    fn from(e: nom::Err<nom::error::Error<I>>) -> Self {
-        #[cfg(feature = "defmt")]
-        defmt::error!("Nom error");
-        #[cfg(not(feature = "defmt"))]
-        fmt::error!("Nom error");
-
-        Self::Pdu(PduError::Decode)
-    }
-}
-
 impl From<PackingError> for Error {
     #[allow(unused)]
     fn from(e: PackingError) -> Self {

@@ -26,6 +26,18 @@ pub fn map_opt<T, U>(
         .ok_or(EepromError::Decode.into())
 }
 
+pub fn new_take(i: &[u8], n: usize) -> Result<(&[u8], &[u8]), Error> {
+    if i.len() < n {
+        return Err(Error::Pdu(PduError::Decode));
+    }
+
+    let (data, i) = i.split_at(n);
+
+    // Yes, swap the order. This is consistent with the rest of the parsing functions and mirrors
+    // nom's API.
+    Ok((i, data))
+}
+
 pub fn new_all_consumed(i: &[u8]) -> Result<(), Error> {
     if i.is_empty() {
         return Ok(());

@@ -1,10 +1,9 @@
 //! An EtherCAT frame.
 
-use crate::LEN_MASK;
-use nom::{
-    combinator::{map, verify},
-    error::ParseError,
-    IResult,
+use crate::{
+    error::{Error, PduError},
+    parse::{map_res, new_le_u16},
+    LEN_MASK,
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, num_enum::FromPrimitive, num_enum::IntoPrimitive)]
@@ -38,18 +37,21 @@ impl FrameHeader {
     }
 
     /// Remove and parse an EtherCAT frame header from the given buffer.
-    pub fn parse<'a, E>(i: &'a [u8]) -> IResult<&[u8], Self, E>
-    where
-        E: ParseError<&'a [u8]>,
-    {
-        verify(map(nom::number::complete::le_u16, Self), |self_| {
-            self_.protocol_type() == ProtocolType::DlPdu
-        })(i)
+    pub fn parse(i: &[u8]) -> Result<(&[u8], Self), Error> {
+        map_res(new_le_u16(i)?, |raw| {
+            let header = Self(raw);
+
+            if header.protocol_type() == ProtocolType::DlPdu {
+                Ok(header)
+            } else {
+                Err(Error::Pdu(PduError::Decode))
+            }
+        })
     }
 
     /// The length of the payload contained in this frame.
-    pub fn payload_len(&self) -> u16 {
-        self.0 & LEN_MASK
+    pub fn payload_len(&self) -> usize {
+        usize::from(self.0 & LEN_MASK)
     }
 
     fn protocol_type(&self) -> ProtocolType {
@@ -89,7 +91,7 @@ mod tests {
         // Header from packet #39, soem-slaveinfo-ek1100-only.pcapng
         let raw = &[0x3c, 0x10];
 
-        let (rest, header) = FrameHeader::parse::<'_, nom::error::Error<_>>(raw).unwrap();
+        let (rest, header) = FrameHeader::parse(raw).unwrap();
 
         assert_eq!(rest, &[]);
 
